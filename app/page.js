@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import QrScanner from 'qr-scanner';
 
@@ -9,6 +9,7 @@ export default function Home() {
   const [validationResult, setValidationResult] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const videoRef = useRef(null); // Referensi ke elemen video
+  const scannerRef = useRef(null); // Referensi ke QrScanner instance
 
   const handleValidate = async (id) => {
     const { data: order, error } = await supabase
@@ -44,17 +45,15 @@ export default function Home() {
   };
 
   const startScanning = async () => {
-    if (isScanning) return; // Jika sedang scanning, tidak perlu memulai ulang
+    if (isScanning) return;
 
     const videoElement = videoRef.current;
-
     if (!videoElement) {
       alert('Video element not found');
       return;
     }
 
     try {
-      // Periksa ketersediaan kamera
       const hasCamera = await QrScanner.hasCamera();
       if (!hasCamera) {
         alert('No camera found on this device.');
@@ -64,25 +63,43 @@ export default function Home() {
       const qrScanner = new QrScanner(
         videoElement,
         (result) => {
-          setOrderId(result.data); // Ambil data dari QR code
-          handleValidate(result.data); // Validasi langsung
-          qrScanner.stop(); // Hentikan scanning setelah sukses
+          console.log('QR Code detected:', result.data); // Log hasil deteksi QR code
+          setOrderId(result.data);
+          handleValidate(result.data);
+          qrScanner.stop();
           setIsScanning(false);
         },
         {
           onDecodeError: (error) => {
-            console.error('QR Decode Error:', error);
+            console.warn('Failed to decode QR Code:', error);
           },
         }
       );
 
+      scannerRef.current = qrScanner; // Simpan instance scanner
       qrScanner.start();
       setIsScanning(true);
     } catch (error) {
-      console.error('Camera Error:', error);
+      console.error('Error initializing camera:', error);
       alert('Failed to access the camera. Check permissions or device.');
     }
   };
+
+  const stopScanning = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop();
+      setIsScanning(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      // Bersihkan scanner saat komponen di-unmount
+      if (scannerRef.current) {
+        scannerRef.current.destroy();
+      }
+    };
+  }, []);
 
   return (
     <div style={{ padding: '20px' }}>
@@ -104,6 +121,7 @@ export default function Home() {
         <button onClick={startScanning}>
           {isScanning ? 'Scanning...' : 'Scan QR Code'}
         </button>
+        {isScanning && <button onClick={stopScanning}>Stop Scanning</button>}
         <div style={{ marginTop: '10px', maxWidth: '400px' }}>
           <video ref={videoRef} style={{ width: '100%' }} />
         </div>
