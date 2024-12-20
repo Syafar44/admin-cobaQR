@@ -8,7 +8,8 @@ export default function Home() {
   const [orderId, setOrderId] = useState('');
   const [validationResult, setValidationResult] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false); // Untuk popup konfirmasi
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [scannedOrderId, setScannedOrderId] = useState('');
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
 
@@ -16,7 +17,7 @@ export default function Home() {
     const { data: order, error } = await supabase
       .from('QRcode')
       .select('*')
-      .eq('id', id)
+      .eq('id', id || orderId)
       .single();
 
     if (error) {
@@ -33,7 +34,7 @@ export default function Home() {
     const { error: updateError } = await supabase
       .from('QRcode')
       .update({ is_scanned: true, status: 'Completed' })
-      .eq('id', id);
+      .eq('id', id || orderId);
 
     if (updateError) {
       console.error('Failed to validate order:', updateError);
@@ -65,9 +66,10 @@ export default function Home() {
         videoElement,
         (result) => {
           console.log('QR Code detected:', result.data);
-          setOrderId(result.data);
+          setScannedOrderId(result.data); // Simpan data QR code untuk konfirmasi
           setShowConfirmation(true); // Tampilkan popup konfirmasi
-          qrScanner.pause(); // Pause scanner sementara menunggu konfirmasi
+          qrScanner.stop(); // Hentikan scanner
+          setIsScanning(false);
         },
         {
           onDecodeError: (error) => {
@@ -94,15 +96,13 @@ export default function Home() {
     }
   };
 
-  const confirmValidation = () => {
-    handleValidate(orderId); // Lakukan validasi
+  const handleConfirm = () => {
     setShowConfirmation(false); // Tutup popup
-    if (scannerRef.current) scannerRef.current.resume(); // Lanjutkan scanner
+    handleValidate(scannedOrderId); // Validasi QR code
   };
 
-  const cancelValidation = () => {
-    setShowConfirmation(false); // Tutup popup
-    if (scannerRef.current) scannerRef.current.resume(); // Lanjutkan scanner
+  const handleCancel = () => {
+    setShowConfirmation(false); // Tutup popup tanpa validasi
   };
 
   useEffect(() => {
@@ -116,6 +116,7 @@ export default function Home() {
   return (
     <div style={{ padding: '20px' }}>
       <h1>Validate Order</h1>
+
       <div>
         <label htmlFor="order-id">Enter Order ID or Scan QR Code:</label>
         <input
@@ -125,7 +126,7 @@ export default function Home() {
           value={orderId}
           onChange={(e) => setOrderId(e.target.value)}
         />
-        <button onClick={() => handleValidate(orderId)}>Validate</button>
+        <button onClick={() => handleValidate()}>Validate</button>
       </div>
 
       <div style={{ marginTop: '20px' }}>
@@ -151,20 +152,18 @@ export default function Home() {
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
             padding: '20px',
-            background: 'white',
             border: '1px solid black',
-            borderRadius: '10px',
             zIndex: 1000,
           }}
         >
-          <h3>Confirm Validation</h3>
-          <p>Do you want to validate this order?</p>
-          <p>Order ID: {orderId}</p>
-          <button onClick={confirmValidation} style={{ marginRight: '10px' }}>
-            Yes
+          <h3>Confirm Order Validation</h3>
+          <p>Order ID: {scannedOrderId}</p>
+          <button onClick={handleConfirm}>Confirm</button>
+          <button onClick={handleCancel} style={{ marginLeft: '10px' }}>
+            Cancel
           </button>
-          <button onClick={cancelValidation}>No</button>
         </div>
       )}
 
