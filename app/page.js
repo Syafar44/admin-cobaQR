@@ -8,8 +8,8 @@ export default function Home() {
   const [orderId, setOrderId] = useState('');
   const [validationResult, setValidationResult] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
-  const videoRef = useRef(null); // Referensi ke elemen video
-  const scannerRef = useRef(null); // Referensi ke QrScanner instance
+  const videoRef = useRef(null);
+  const scannerRef = useRef(null);
 
   const handleValidate = async (id) => {
     const { data: order, error } = await supabase
@@ -19,7 +19,7 @@ export default function Home() {
       .single();
 
     if (error) {
-      console.error(error);
+      console.error('Order not found:', error);
       alert('Order not found');
       return;
     }
@@ -35,7 +35,7 @@ export default function Home() {
       .eq('id', id || orderId);
 
     if (updateError) {
-      console.error(updateError);
+      console.error('Failed to validate order:', updateError);
       alert('Failed to validate order');
       return;
     }
@@ -63,7 +63,7 @@ export default function Home() {
       const qrScanner = new QrScanner(
         videoElement,
         (result) => {
-          console.log('QR Code detected:', result.data); // Log hasil deteksi QR code
+          console.log('QR Code detected:', result.data);
           setOrderId(result.data);
           handleValidate(result.data);
           qrScanner.stop();
@@ -71,12 +71,14 @@ export default function Home() {
         },
         {
           onDecodeError: (error) => {
-            console.warn('Failed to decode QR Code:', error);
+            console.warn('QR Decode Error:', error.message);
           },
+          highlightScanRegion: true,
         }
       );
 
-      scannerRef.current = qrScanner; // Simpan instance scanner
+      scannerRef.current = qrScanner;
+      console.log('Starting QR Scanner...');
       qrScanner.start();
       setIsScanning(true);
     } catch (error) {
@@ -94,7 +96,6 @@ export default function Home() {
 
   useEffect(() => {
     return () => {
-      // Bersihkan scanner saat komponen di-unmount
       if (scannerRef.current) {
         scannerRef.current.destroy();
       }
@@ -104,7 +105,6 @@ export default function Home() {
   return (
     <div style={{ padding: '20px' }}>
       <h1>Validate Order</h1>
-
       <div>
         <label htmlFor="order-id">Enter Order ID or Scan QR Code:</label>
         <input
@@ -123,7 +123,13 @@ export default function Home() {
         </button>
         {isScanning && <button onClick={stopScanning}>Stop Scanning</button>}
         <div style={{ marginTop: '10px', maxWidth: '400px' }}>
-          <video ref={videoRef} style={{ width: '100%' }} />
+          <video
+            ref={videoRef}
+            style={{ width: '100%' }}
+            playsInline
+            autoPlay
+            muted
+          />
         </div>
       </div>
 
